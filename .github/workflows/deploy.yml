@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]  # or your default branch
 
 jobs:
   build-and-deploy:
@@ -14,18 +14,22 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 18  # Using Node.js 18 for better compatibility
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
+        # This flag will bypass peer dependency checks
 
-      - name: Build and Export
-        run: |
-          npm run build
-          touch out/.nojekyll
+      - name: Build
+        run: npm run build
+        
+      - name: Add .nojekyll file
+        run: touch out/.nojekyll
+        # This prevents GitHub from processing files with Jekyll
 
-      - name: Deploy
+      - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: gh-pages
-          folder: out
+          branch: gh-pages  # The branch the action should deploy to
+          folder: out       # The folder the action should deploy
+          clean: true       # Automatically remove deleted files from the deployment
