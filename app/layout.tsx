@@ -15,7 +15,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <title>InvoiceForge - Professional Invoice Generator</title>
-        <meta name="description" content="Create professional invoices in seconds with InvoiceForge" />
+        <meta name="description" content="Create a professional invoice in seconds with InvoiceForge" />
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
