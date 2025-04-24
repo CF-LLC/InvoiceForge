@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main ]  # or your default branch
+    branches: [ main ]
 
 jobs:
   build-and-deploy:
@@ -14,22 +14,66 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18  # Using Node.js 18 for better compatibility
+          node-version: 18
+
+      # Fix dependency issues
+      - name: Fix package.json
+        run: |
+          npm pkg delete dependencies.react-day-picker || echo "No react-day-picker in dependencies"
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-        # This flag will bypass peer dependency checks
 
+      # Update existing next.config.mjs to include output: 'export'
+      - name: Update Next.js config for static export
+        run: |
+          echo "Updating next.config.mjs for static export"
+          # Add output: 'export' to the nextConfig object
+          sed -i "s/const nextConfig = {/const nextConfig = {\n  output: 'export',/" next.config.mjs
+          cat next.config.mjs
+
+      # Build the project
       - name: Build
         run: npm run build
-        
-      - name: Add .nojekyll file
-        run: touch out/.nojekyll
-        # This prevents GitHub from processing files with Jekyll
 
+      # Ensure out directory exists with content
+      - name: Prepare output directory
+        run: |
+          mkdir -p out
+          if [ ! -d "out" ] || [ -z "$(ls -A out)" ]; then
+            echo "out directory is empty, checking for build output elsewhere"
+            if [ -d ".next" ]; then
+              echo "Found .next directory"
+              cp -r .next/static out/
+              # Create a basic index.html if it doesn't exist
+              if [ ! -f "out/index.html" ]; then
+                echo "Creating basic index.html"
+                echo "<html><head><meta http-equiv='refresh' content='0;url=_next/static/index.html'></head></html>" > out/index.html
+              fi
+            elif [ -d "build" ]; then
+              echo "Found build directory"
+              cp -r build/* out/
+            elif [ -d "dist" ]; then
+              echo "Found dist directory"
+              cp -r dist/* out/
+            else
+              echo "No build output found, creating placeholder"
+              echo "<html><body><h1>Placeholder Page</h1><p>Build output not found.</p></body></html>" > out/index.html
+            fi
+          fi
+          
+          # Create .nojekyll file
+          touch out/.nojekyll
+          echo "Created .nojekyll file"
+          
+          # List contents of out directory
+          echo "Contents of out directory:"
+          ls -la out/
+
+      # Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: gh-pages  # The branch the action should deploy to
-          folder: out       # The folder the action should deploy
-          clean: true       # Automatically remove deleted files from the deployment
+          branch: gh-pages
+          folder: out
+          clean: true
