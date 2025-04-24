@@ -7,6 +7,7 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'export',
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -16,6 +17,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Add these two lines for GitHub Pages
+  basePath: '/InvoiceForge',
+  assetPrefix: '/InvoiceForge',
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
