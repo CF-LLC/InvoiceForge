@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { motion } from "framer-motion"
-import { Trash2, Plus, Save } from "lucide-react"
+import { Download, Plus, Save, Trash2, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +11,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
+import {
+  appConfig,
+  defaultAppSettings,
+  formatCurrency,
+  INVOICE_TEMPLATE_STORAGE_KEY,
+  type AppSettings,
+  type InvoiceData,
+} from "@/lib/invoice-config"
 
 const invoiceItemSchema = z.object({
   description: z.string().min(1, "Description is required"),
@@ -22,9 +30,13 @@ const formSchema = z.object({
   invoiceNumber: z.string().min(1, "Invoice number is required"),
   date: z.string().min(1, "Date is required"),
   dueDate: z.string().min(1, "Due date is required"),
+  senderName: z.string().min(1, "Business name is required"),
+  senderEmail: z.string().email("Invalid business email address"),
+  senderAddress: z.string().min(1, "Business address is required"),
   clientName: z.string().min(1, "Client name is required"),
   clientEmail: z.string().email("Invalid email address"),
   clientAddress: z.string().min(1, "Client address is required"),
+  currencyCode: z.string().length(3, "Use 3-letter code like USD").transform((value) => value.toUpperCase()),
   items: z.array(invoiceItemSchema).min(1, "At least one item is required"),
   taxEnabled: z.boolean().default(false),
   taxRate: z.coerce.number().min(0, "Tax rate must be at least 0").max(100, "Tax rate cannot exceed 100").default(10),
@@ -33,7 +45,17 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-export function InvoiceForm({ onSubmit, initialData }: { onSubmit: (data: FormValues) => void; initialData: any }) {
+export function InvoiceForm({
+  onSubmit,
+  initialData,
+  appSettings,
+  onSettingsChange,
+}: {
+  onSubmit: (data: FormValues) => void
+  initialData: InvoiceData
+  appSettings: AppSettings
+  onSettingsChange: (settings: AppSettings) => void
+}) {
   const {
     register,
     handleSubmit,
@@ -78,8 +100,83 @@ export function InvoiceForm({ onSubmit, initialData }: { onSubmit: (data: FormVa
     return subtotal
   }
 
+  const currencyCode = watch("currencyCode") || appConfig.defaults.currencyCode
+
   const onFormSubmit = (data: FormValues) => {
     onSubmit(data)
+  }
+
+  const handleTemplateSave = () => {
+    const template = {
+      senderName: watch("senderName"),
+      senderEmail: watch("senderEmail"),
+      senderAddress: watch("senderAddress"),
+      currencyCode: watch("currencyCode"),
+      taxEnabled: watch("taxEnabled"),
+      taxRate: watch("taxRate"),
+      notes: watch("notes") || "",
+    }
+
+    localStorage.setItem(INVOICE_TEMPLATE_STORAGE_KEY, JSON.stringify(template))
+    toast({
+      title: "Template saved",
+      description: "Business profile template saved to this browser.",
+    })
+  }
+
+  const handleTemplateLoad = () => {
+    try {
+      const raw = localStorage.getItem(INVOICE_TEMPLATE_STORAGE_KEY)
+      if (!raw) {
+        toast({
+          title: "No template found",
+          description: "Save a template first, then load it here.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const template = JSON.parse(raw) as Partial<InvoiceData>
+      if (template.senderName) setValue("senderName", template.senderName)
+      if (template.senderEmail) setValue("senderEmail", template.senderEmail)
+      if (template.senderAddress) setValue("senderAddress", template.senderAddress)
+      if (template.currencyCode) setValue("currencyCode", template.currencyCode)
+      if (typeof template.taxEnabled === "boolean") setValue("taxEnabled", template.taxEnabled)
+      if (typeof template.taxRate === "number") setValue("taxRate", template.taxRate)
+      if (typeof template.notes === "string") setValue("notes", template.notes)
+
+      toast({
+        title: "Template loaded",
+        description: "Saved business profile applied to this invoice.",
+      })
+    } catch (error) {
+      console.error("Failed to load template:", error)
+      toast({
+        title: "Template load failed",
+        description: "The saved template could not be read.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleTemplateClear = () => {
+    localStorage.removeItem(INVOICE_TEMPLATE_STORAGE_KEY)
+    toast({
+      title: "Template cleared",
+      description: "Saved business profile template removed from this browser.",
+    })
+  }
+
+  const handleResetSettings = () => {
+    onSettingsChange(defaultAppSettings)
+    toast({
+      title: "Settings reset",
+      description: "App settings restored to defaults.",
+    })
+  }
+
+  const updateSetting = (key: keyof AppSettings, value: string) => {
+    onSettingsChange({ ...appSettings, [key]: value })
   }
 
   return (
@@ -90,6 +187,51 @@ export function InvoiceForm({ onSubmit, initialData }: { onSubmit: (data: FormVa
       </CardHeader>
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <CardContent className="space-y-6">
+          <div className="space-y-4 rounded-md border p-4 bg-gray-50/60 dark:bg-gray-900/40">
+            <h3 className="text-lg font-medium">App Settings</h3>
+            <p className="text-sm text-muted-foreground">Updates are saved automatically for this browser.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="appName">App Name</Label>
+                <Input
+                  id="appName"
+                  value={appSettings.appName}
+                  onChange={(e) => updateSetting("appName", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="appLocale">Locale</Label>
+                <Input
+                  id="appLocale"
+                  placeholder="en-US"
+                  value={appSettings.locale}
+                  onChange={(e) => updateSetting("locale", e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="appTagline">Tagline</Label>
+              <Input
+                id="appTagline"
+                value={appSettings.appTagline}
+                onChange={(e) => updateSetting("appTagline", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="footerMessage">Footer Message</Label>
+              <Input
+                id="footerMessage"
+                value={appSettings.footerMessage}
+                onChange={(e) => updateSetting("footerMessage", e.target.value)}
+              />
+            </div>
+            <div>
+              <Button type="button" variant="outline" onClick={handleResetSettings}>
+                Reset Settings
+              </Button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="invoiceNumber">Invoice Number</Label>
@@ -115,6 +257,64 @@ export function InvoiceForm({ onSubmit, initialData }: { onSubmit: (data: FormVa
                 className={errors.dueDate ? "border-red-500" : ""}
               />
               {errors.dueDate && <p className="text-red-500 text-sm">{errors.dueDate.message}</p>}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Your Business Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="senderName">Business Name</Label>
+                <Input
+                  id="senderName"
+                  placeholder="Your Business Name"
+                  {...register("senderName")}
+                  className={errors.senderName ? "border-red-500" : ""}
+                />
+                {errors.senderName && <p className="text-red-500 text-sm">{errors.senderName.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="senderEmail">Business Email</Label>
+                <Input
+                  id="senderEmail"
+                  placeholder="you@example.com"
+                  {...register("senderEmail")}
+                  className={errors.senderEmail ? "border-red-500" : ""}
+                />
+                {errors.senderEmail && <p className="text-red-500 text-sm">{errors.senderEmail.message}</p>}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="senderAddress">Business Address</Label>
+              <Textarea
+                id="senderAddress"
+                placeholder="Business address"
+                {...register("senderAddress")}
+                className={errors.senderAddress ? "border-red-500" : ""}
+              />
+              {errors.senderAddress && <p className="text-red-500 text-sm">{errors.senderAddress.message}</p>}
+            </div>
+            <div className="space-y-2 max-w-xs">
+              <Label htmlFor="currencyCode">Currency Code</Label>
+              <Input
+                id="currencyCode"
+                placeholder="USD"
+                maxLength={3}
+                {...register("currencyCode")}
+                className={errors.currencyCode ? "border-red-500 uppercase" : "uppercase"}
+              />
+              {errors.currencyCode && <p className="text-red-500 text-sm">{errors.currencyCode.message}</p>}
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={handleTemplateSave}>
+                <Download className="h-4 w-4 mr-2" /> Save Template
+              </Button>
+              <Button type="button" variant="outline" onClick={handleTemplateLoad}>
+                <Upload className="h-4 w-4 mr-2" /> Load Template
+              </Button>
+              <Button type="button" variant="outline" onClick={handleTemplateClear}>
+                Clear Template
+              </Button>
             </div>
           </div>
 
@@ -227,7 +427,7 @@ export function InvoiceForm({ onSubmit, initialData }: { onSubmit: (data: FormVa
             <div className="flex justify-end">
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md">
                 <p className="text-right font-medium">
-                  Total: <span className="text-lg">${calculateTotal().toFixed(2)}</span>
+                  Total: <span className="text-lg">{formatCurrency(calculateTotal(), currencyCode, appSettings.locale)}</span>
                 </p>
               </div>
             </div>

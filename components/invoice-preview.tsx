@@ -1,16 +1,34 @@
 "use client"
 import { useState, useRef } from "react"
 import { motion } from "framer-motion"
-import { ArrowLeft, FileImage, Printer } from "lucide-react"
+import { ArrowLeft, FileImage, FileText, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { toast } from "@/components/ui/use-toast"
 import html2canvas from "html2canvas"
+import { formatCurrency, type AppSettings, type InvoiceData } from "@/lib/invoice-config"
 
-export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBack: () => void }) {
-  const [isExporting, setIsExporting] = useState(false)
+export function InvoicePreview({
+  invoiceData,
+  appSettings,
+  onBack,
+}: {
+  invoiceData: InvoiceData
+  appSettings: AppSettings
+  onBack: () => void
+}) {
+  const [exportingFormat, setExportingFormat] = useState<"none" | "image" | "pdf">("none")
   const invoiceRef = useRef<HTMLDivElement>(null)
+  const locale = appSettings.locale || "en-US"
+
+  const getIssuedDate = () => {
+    try {
+      return new Date(invoiceData.date).toLocaleDateString(locale)
+    } catch {
+      return invoiceData.date
+    }
+  }
 
   const captureInvoice = async () => {
     if (!invoiceRef.current) return null
@@ -46,7 +64,7 @@ export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBa
   }
 
   const handleExportImage = async () => {
-    setIsExporting(true)
+    setExportingFormat("image")
 
     try {
       const canvas = await captureInvoice()
@@ -81,12 +99,65 @@ export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBa
         duration: 3000,
       })
     } finally {
-      setIsExporting(false)
+      setExportingFormat("none")
+    }
+  }
+
+  const handleExportPdf = async () => {
+    setExportingFormat("pdf")
+
+    try {
+      const canvas = await captureInvoice()
+      if (!canvas) {
+        throw new Error("Failed to capture invoice")
+      }
+
+      const dataUrl = canvas.toDataURL("image/png")
+      const printWindow = window.open("", "_blank")
+
+      if (!printWindow) {
+        throw new Error("Popup blocked")
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice-${invoiceData.invoiceNumber}.pdf</title>
+            <style>
+              body { margin: 0; padding: 16px; background: #f3f4f6; }
+              img { width: 100%; max-width: 900px; display: block; margin: 0 auto; background: white; }
+            </style>
+          </head>
+          <body>
+            <img src="${dataUrl}" alt="Invoice" />
+            <script>
+              window.onload = function() {
+                window.print();
+              };
+            </script>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+
+      toast({
+        title: "PDF export ready",
+        description: "Print dialog opened. Choose Save as PDF.",
+      })
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to export PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setExportingFormat("none")
     }
   }
 
   const calculateSubtotal = () => {
-    return invoiceData.items.reduce((total: number, item: any) => total + item.quantity * item.price, 0)
+    return invoiceData.items.reduce((total, item) => total + item.quantity * item.price, 0)
   }
 
   const calculateTax = () => {
@@ -109,12 +180,21 @@ export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBa
             <Printer className="h-4 w-4" /> Print
           </Button>
           <Button
+            variant="outline"
+            onClick={handleExportPdf}
+            disabled={exportingFormat !== "none"}
+            className="flex items-center gap-2"
+          >
+            {exportingFormat === "pdf" ? <LoadingSpinner size="sm" /> : <FileText className="h-4 w-4" />}
+            {exportingFormat === "pdf" ? "Preparing PDF..." : "Export PDF"}
+          </Button>
+          <Button
             onClick={handleExportImage}
-            disabled={isExporting}
+            disabled={exportingFormat !== "none"}
             className="bg-green-700 hover:bg-green-600 flex items-center gap-2"
           >
-            {isExporting ? <LoadingSpinner size="sm" /> : <FileImage className="h-4 w-4" />}
-            {isExporting ? "Exporting..." : "Save as Image"}
+            {exportingFormat === "image" ? <LoadingSpinner size="sm" /> : <FileImage className="h-4 w-4" />}
+            {exportingFormat === "image" ? "Exporting..." : "Save as Image"}
           </Button>
         </div>
       </div>
@@ -131,12 +211,13 @@ export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBa
                 <span className="text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 px-2 py-0.5 rounded">
                   #{invoiceData.invoiceNumber}
                 </span>
-                <span className="text-sm text-gray-500">Issued: {new Date(invoiceData.date).toLocaleDateString()}</span>
+                <span className="text-sm text-gray-500">Issued: {getIssuedDate()}</span>
               </div>
             </div>
             <div className="text-right">
-              <h3 className="font-bold text-xl">CF LLC</h3>
-              <p className="text-sm text-gray-500">cooperfeatherstonellc@gmail.com</p>
+              <h3 className="font-bold text-xl">{invoiceData.senderName}</h3>
+              <p className="text-sm text-gray-500">{invoiceData.senderEmail}</p>
+              <p className="text-sm text-gray-500 whitespace-pre-line">{invoiceData.senderAddress}</p>
             </div>
           </div>
         </CardHeader>
@@ -197,7 +278,7 @@ export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBa
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                  {invoiceData.items.map((item: any, index: number) => (
+                  {invoiceData.items.map((item, index) => (
                     <motion.tr
                       key={index}
                       initial={{ opacity: 0, y: 10 }}
@@ -207,10 +288,10 @@ export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBa
                       <td className="px-6 py-4 text-sm text-gray-800 dark:text-gray-200">{item.description}</td>
                       <td className="px-6 py-4 text-sm text-gray-800 dark:text-gray-200 text-right">{item.quantity}</td>
                       <td className="px-6 py-4 text-sm text-gray-800 dark:text-gray-200 text-right">
-                        ${Number(item.price).toFixed(2)}
+                        {formatCurrency(Number(item.price), invoiceData.currencyCode, locale)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-800 dark:text-gray-200 text-right font-medium">
-                        ${(item.quantity * item.price).toFixed(2)}
+                        {formatCurrency(item.quantity * item.price, invoiceData.currencyCode, locale)}
                       </td>
                     </motion.tr>
                   ))}
@@ -225,18 +306,18 @@ export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBa
               <div className="w-64 space-y-3 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
-                  <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
+                  <span className="font-medium">{formatCurrency(calculateSubtotal(), invoiceData.currencyCode, locale)}</span>
                 </div>
                 {invoiceData.taxEnabled && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600 dark:text-gray-400">Tax ({invoiceData.taxRate}%):</span>
-                    <span className="font-medium">${calculateTax().toFixed(2)}</span>
+                    <span className="font-medium">{formatCurrency(calculateTax(), invoiceData.currencyCode, locale)}</span>
                   </div>
                 )}
                 <div className="flex justify-between border-t dark:border-gray-700 pt-3 mt-3">
                   <span className="font-bold">Total:</span>
                   <span className="font-bold text-lg text-green-700 dark:text-green-500">
-                    ${calculateTotal().toFixed(2)}
+                    {formatCurrency(calculateTotal(), invoiceData.currencyCode, locale)}
                   </span>
                 </div>
               </div>
@@ -256,7 +337,7 @@ export function InvoicePreview({ invoiceData, onBack }: { invoiceData: any; onBa
 
         <CardFooter className="border-t text-center py-6 bg-gray-50 dark:bg-gray-800/30">
           <div className="w-full">
-            <p className="text-gray-500 mb-2">Thank you for your business!</p>
+            <p className="text-gray-500 mb-2">{appSettings.footerMessage}</p>
             <div className="h-1 w-24 bg-green-500 mx-auto rounded-full"></div>
           </div>
         </CardFooter>

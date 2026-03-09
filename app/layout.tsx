@@ -1,10 +1,17 @@
 import type React from "react"
-import "@/app/globals.css"
+import "./globals.css"
 import { Inter } from "next/font/google"
+import type { Metadata } from "next"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { appConfig } from "@/lib/invoice-config"
 
 const inter = Inter({ subsets: ["latin"] })
+
+export const metadata: Metadata = {
+  title: appConfig.appName,
+  description: appConfig.description,
+}
 
 export default function RootLayout({
   children,
@@ -13,10 +20,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <title>InvoiceForge - Professional Invoice Generator</title>
-        <meta name="description" content="Create a professional invoice in seconds with InvoiceForge" />
-      </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
@@ -26,11 +29,3 @@ export default function RootLayout({
     </html>
   )
 }
-
-
-
-import './globals.css'
-
-export const metadata = {
-      generator: 'v0.dev'
-    };

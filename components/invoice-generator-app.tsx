@@ -1,27 +1,41 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect"
 import { InvoiceForm } from "@/components/invoice-form"
 import { InvoicePreview } from "@/components/invoice-preview"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { motion, AnimatePresence } from "framer-motion"
+import {
+  APP_SETTINGS_STORAGE_KEY,
+  appConfig,
+  defaultAppSettings,
+  type AppSettings,
+  type InvoiceData,
+} from "@/lib/invoice-config"
 
 export default function InvoiceGeneratorApp() {
   const [isLoading, setIsLoading] = useState(false)
   const [currentView, setCurrentView] = useState<"form" | "preview">("form")
   const [loadingMessage, setLoadingMessage] = useState("Processing...")
-  const [invoiceData, setInvoiceData] = useState({
+  const [appSettings, setAppSettings] = useState<AppSettings>(defaultAppSettings)
+  const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     invoiceNumber: "",
     date: "",
     dueDate: "",
+    senderName: appConfig.defaults.senderName,
+    senderEmail: appConfig.defaults.senderEmail,
+    senderAddress: appConfig.defaults.senderAddress,
     clientName: "",
     clientEmail: "",
     clientAddress: "",
+    currencyCode: appConfig.defaults.currencyCode,
     items: [{ description: "", quantity: 1, price: 0 }],
+    taxEnabled: false,
+    taxRate: appConfig.defaults.taxRate,
     notes: "",
   })
 
-  const handleFormSubmit = (data: any) => {
+  const handleFormSubmit = (data: InvoiceData) => {
     setIsLoading(true)
     setLoadingMessage("Generating invoice...")
     // Simulate API call
@@ -34,6 +48,22 @@ export default function InvoiceGeneratorApp() {
 
   const handleBack = () => {
     setCurrentView("form")
+  }
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(APP_SETTINGS_STORAGE_KEY)
+      if (!saved) return
+      const parsed = JSON.parse(saved) as AppSettings
+      setAppSettings({ ...defaultAppSettings, ...parsed })
+    } catch (error) {
+      console.error("Failed to load app settings:", error)
+    }
+  }, [])
+
+  const handleSettingsChange = (settings: AppSettings) => {
+    setAppSettings(settings)
+    localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
   }
 
   return (
@@ -63,10 +93,8 @@ export default function InvoiceGeneratorApp() {
           transition={{ duration: 0.5 }}
           className="text-center mb-8"
         >
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">
-            Invoice<span className="text-green-400">Forge</span>
-          </h1>
-          <p className="mt-3 text-xl text-gray-300 max-w-2xl mx-auto">Create professional invoices in seconds</p>
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">{appSettings.appName}</h1>
+          <p className="mt-3 text-xl text-gray-300 max-w-2xl mx-auto">{appSettings.appTagline}</p>
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -88,7 +116,12 @@ export default function InvoiceGeneratorApp() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <InvoiceForm onSubmit={handleFormSubmit} initialData={invoiceData} />
+              <InvoiceForm
+                onSubmit={handleFormSubmit}
+                initialData={invoiceData}
+                appSettings={appSettings}
+                onSettingsChange={handleSettingsChange}
+              />
             </motion.div>
           ) : (
             <motion.div
@@ -98,7 +131,7 @@ export default function InvoiceGeneratorApp() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
             >
-              <InvoicePreview invoiceData={invoiceData} onBack={handleBack} />
+              <InvoicePreview invoiceData={invoiceData} appSettings={appSettings} onBack={handleBack} />
             </motion.div>
           )}
         </AnimatePresence>
