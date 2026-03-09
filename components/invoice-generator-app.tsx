@@ -1,23 +1,16 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { CanvasRevealEffect } from "@/components/ui/canvas-reveal-effect"
 import { InvoiceForm } from "@/components/invoice-form"
 import { InvoicePreview } from "@/components/invoice-preview"
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-  APP_SETTINGS_STORAGE_KEY,
-  appConfig,
-  defaultAppSettings,
-  type AppSettings,
-  type InvoiceData,
-} from "@/lib/invoice-config"
+import { appConfig, type InvoiceData } from "@/lib/invoice-config"
 
 export default function InvoiceGeneratorApp() {
   const [isLoading, setIsLoading] = useState(false)
   const [currentView, setCurrentView] = useState<"form" | "preview">("form")
   const [loadingMessage, setLoadingMessage] = useState("Processing...")
-  const [appSettings, setAppSettings] = useState<AppSettings>(defaultAppSettings)
   const [invoiceData, setInvoiceData] = useState<InvoiceData>({
     invoiceNumber: "",
     date: "",
@@ -50,26 +43,10 @@ export default function InvoiceGeneratorApp() {
     setCurrentView("form")
   }
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(APP_SETTINGS_STORAGE_KEY)
-      if (!saved) return
-      const parsed = JSON.parse(saved) as AppSettings
-      setAppSettings({ ...defaultAppSettings, ...parsed })
-    } catch (error) {
-      console.error("Failed to load app settings:", error)
-    }
-  }, [])
-
-  const handleSettingsChange = (settings: AppSettings) => {
-    setAppSettings(settings)
-    localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
-  }
-
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden print:bg-white">
       {/* Canvas Reveal Effect Background */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 print:hidden">
         <CanvasRevealEffect
           animationSpeed={2}
           containerClassName="bg-black"
@@ -91,10 +68,10 @@ export default function InvoiceGeneratorApp() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-8"
+          className="text-center mb-8 print:hidden"
         >
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">{appSettings.appName}</h1>
-          <p className="mt-3 text-xl text-gray-300 max-w-2xl mx-auto">{appSettings.appTagline}</p>
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight">{appConfig.appName}</h1>
+          <p className="mt-3 text-xl text-gray-300 max-w-2xl mx-auto">{appConfig.appTagline}</p>
         </motion.div>
 
         <AnimatePresence mode="wait">
@@ -119,8 +96,6 @@ export default function InvoiceGeneratorApp() {
               <InvoiceForm
                 onSubmit={handleFormSubmit}
                 initialData={invoiceData}
-                appSettings={appSettings}
-                onSettingsChange={handleSettingsChange}
               />
             </motion.div>
           ) : (
@@ -131,7 +106,7 @@ export default function InvoiceGeneratorApp() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
             >
-              <InvoicePreview invoiceData={invoiceData} appSettings={appSettings} onBack={handleBack} />
+              <InvoicePreview invoiceData={invoiceData} onBack={handleBack} />
             </motion.div>
           )}
         </AnimatePresence>

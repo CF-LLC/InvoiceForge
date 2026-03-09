@@ -5,7 +5,6 @@ This app generates professional invoices and exports them as an image.
 ## What Changed
 
 - Removed hardcoded company details from the invoice preview.
-- Added in-app settings panel for universal customization (no code edits needed).
 - Added business profile fields directly in the form:
 	- Business name
 	- Business email
@@ -29,8 +28,6 @@ Edit `lib/invoice-config.ts` to change global defaults:
 - `defaults.locale`
 - `defaults.taxRate`
 
-Or customize directly from the UI in the **App Settings** panel.
-
 ## Reusable Templates
 
 In the form, use:
@@ -41,9 +38,6 @@ In the form, use:
 
 Templates are stored per browser using local storage.
 
-## Settings Controls
-
-- `Reset Settings` restores app name/tagline/locale/footer message to defaults.
 
 ## Export Options
 

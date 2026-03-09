@@ -12,22 +12,7 @@ export const appConfig = {
   },
 }
 
-export const APP_SETTINGS_STORAGE_KEY = "invoice-app-settings:v1"
 export const INVOICE_TEMPLATE_STORAGE_KEY = "invoice-template:v1"
-
-export type AppSettings = {
-  appName: string
-  appTagline: string
-  locale: string
-  footerMessage: string
-}
-
-export const defaultAppSettings: AppSettings = {
-  appName: appConfig.appName,
-  appTagline: appConfig.appTagline,
-  locale: appConfig.defaults.locale,
-  footerMessage: "Thank you for your business!",
-}
 
 export type InvoiceItem = {
   description: string

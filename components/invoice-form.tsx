@@ -13,10 +13,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/use-toast"
 import {
   appConfig,
-  defaultAppSettings,
   formatCurrency,
   INVOICE_TEMPLATE_STORAGE_KEY,
-  type AppSettings,
   type InvoiceData,
 } from "@/lib/invoice-config"
 
@@ -48,13 +46,9 @@ type FormValues = z.infer<typeof formSchema>
 export function InvoiceForm({
   onSubmit,
   initialData,
-  appSettings,
-  onSettingsChange,
 }: {
   onSubmit: (data: FormValues) => void
   initialData: InvoiceData
-  appSettings: AppSettings
-  onSettingsChange: (settings: AppSettings) => void
 }) {
   const {
     register,
@@ -167,18 +161,6 @@ export function InvoiceForm({
     })
   }
 
-  const handleResetSettings = () => {
-    onSettingsChange(defaultAppSettings)
-    toast({
-      title: "Settings reset",
-      description: "App settings restored to defaults.",
-    })
-  }
-
-  const updateSetting = (key: keyof AppSettings, value: string) => {
-    onSettingsChange({ ...appSettings, [key]: value })
-  }
-
   return (
     <Card className="w-full bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
       <CardHeader>
@@ -187,51 +169,6 @@ export function InvoiceForm({
       </CardHeader>
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <CardContent className="space-y-6">
-          <div className="space-y-4 rounded-md border p-4 bg-gray-50/60 dark:bg-gray-900/40">
-            <h3 className="text-lg font-medium">App Settings</h3>
-            <p className="text-sm text-muted-foreground">Updates are saved automatically for this browser.</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="appName">App Name</Label>
-                <Input
-                  id="appName"
-                  value={appSettings.appName}
-                  onChange={(e) => updateSetting("appName", e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="appLocale">Locale</Label>
-                <Input
-                  id="appLocale"
-                  placeholder="en-US"
-                  value={appSettings.locale}
-                  onChange={(e) => updateSetting("locale", e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="appTagline">Tagline</Label>
-              <Input
-                id="appTagline"
-                value={appSettings.appTagline}
-                onChange={(e) => updateSetting("appTagline", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="footerMessage">Footer Message</Label>
-              <Input
-                id="footerMessage"
-                value={appSettings.footerMessage}
-                onChange={(e) => updateSetting("footerMessage", e.target.value)}
-              />
-            </div>
-            <div>
-              <Button type="button" variant="outline" onClick={handleResetSettings}>
-                Reset Settings
-              </Button>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="invoiceNumber">Invoice Number</Label>
@@ -427,7 +364,7 @@ export function InvoiceForm({
             <div className="flex justify-end">
               <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-md">
                 <p className="text-right font-medium">
-                  Total: <span className="text-lg">{formatCurrency(calculateTotal(), currencyCode, appSettings.locale)}</span>
+                  Total: <span className="text-lg">{formatCurrency(calculateTotal(), currencyCode, appConfig.defaults.locale)}</span>
                 </p>
               </div>
             </div>

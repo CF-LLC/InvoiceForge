@@ -7,20 +7,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { LoadingSpinner } from "@/components/loading-spinner"
 import { toast } from "@/components/ui/use-toast"
 import html2canvas from "html2canvas"
-import { formatCurrency, type AppSettings, type InvoiceData } from "@/lib/invoice-config"
+import { appConfig, formatCurrency, type InvoiceData } from "@/lib/invoice-config"
 
-export function InvoicePreview({
-  invoiceData,
-  appSettings,
-  onBack,
-}: {
-  invoiceData: InvoiceData
-  appSettings: AppSettings
-  onBack: () => void
-}) {
+export function InvoicePreview({ invoiceData, onBack }: { invoiceData: InvoiceData; onBack: () => void }) {
   const [exportingFormat, setExportingFormat] = useState<"none" | "image" | "pdf">("none")
   const invoiceRef = useRef<HTMLDivElement>(null)
-  const locale = appSettings.locale || "en-US"
+  const locale = appConfig.defaults.locale
 
   const getIssuedDate = () => {
     try {
@@ -156,6 +148,54 @@ export function InvoicePreview({
     }
   }
 
+  const handlePrintInvoice = async () => {
+    setExportingFormat("pdf")
+    try {
+      const canvas = await captureInvoice()
+      if (!canvas) {
+        throw new Error("Failed to capture invoice")
+      }
+
+      const dataUrl = canvas.toDataURL("image/png")
+      const printWindow = window.open("", "_blank")
+
+      if (!printWindow) {
+        throw new Error("Popup blocked")
+      }
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice-${invoiceData.invoiceNumber}</title>
+            <style>
+              body { margin: 0; padding: 16px; background: #ffffff; }
+              img { width: 100%; max-width: 900px; display: block; margin: 0 auto; }
+              @page { margin: 10mm; }
+            </style>
+          </head>
+          <body>
+            <img src="${dataUrl}" alt="Invoice" />
+            <script>
+              window.onload = function() {
+                window.print();
+              };
+            </script>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+    } catch (error) {
+      console.error("Error printing invoice:", error)
+      toast({
+        title: "Error",
+        description: "Failed to prepare print view. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setExportingFormat("none")
+    }
+  }
+
   const calculateSubtotal = () => {
     return invoiceData.items.reduce((total, item) => total + item.quantity * item.price, 0)
   }
@@ -171,12 +211,12 @@ export function InvoicePreview({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
         <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" /> Back to Edit
         </Button>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => window.print()} className="flex items-center gap-2">
+          <Button variant="outline" onClick={handlePrintInvoice} className="flex items-center gap-2">
             <Printer className="h-4 w-4" /> Print
           </Button>
           <Button
@@ -337,7 +377,7 @@ export function InvoicePreview({
 
         <CardFooter className="border-t text-center py-6 bg-gray-50 dark:bg-gray-800/30">
           <div className="w-full">
-            <p className="text-gray-500 mb-2">{appSettings.footerMessage}</p>
+            <p className="text-gray-500 mb-2">Thank you for your business!</p>
             <div className="h-1 w-24 bg-green-500 mx-auto rounded-full"></div>
           </div>
         </CardFooter>
